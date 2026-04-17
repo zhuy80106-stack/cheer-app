@@ -2,7 +2,7 @@ import requests
 import streamlit as st
 import datetime
 from datetime import timedelta
-from bs4 import BeautifulSoup
+import pandas as pd
 
 st.set_page_config(page_title="USD to TWD Converter")
 
@@ -14,28 +14,16 @@ def get_last_business_day(date):
         check_date -= timedelta(days=1)
     return None
 
-def get_rate_from_bot(date):
-    url = f"https://rate.bot.com.tw/xrt/quote/{date.strftime('%Y-%m')}/USD"
+@st.cache_data
+def get_rates_from_bot(month_str):
+    url = f"https://rate.bot.com.tw/xrt/quote/{month_str}/USD"
     headers = {"User-Agent": "Mozilla/5.0"}
     response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
-    table = soup.find("table")
-    rows = table.find_all("tr")
-    
-    date_str = date.strftime("%Y/%m/%d")
-    for row in rows:
-        cells = row.find_all("td")
-        if len(cells) >= 5 and date_str in row.text:
-            try:
-                return {
-                    "cash_buy": float(cells[0].text.strip()),
-                    "cash_sell": float(cells[1].text.strip()),
-                    "spot_buy": float(cells[2].text.strip()),
-                    "spot_sell": float(cells[3].text.strip()),
-                }
-            except:
-                continue
-    return None
+    tables = pd.read_html(response.text)
+    df = tables[0]
+    df.columns = ["date", "currency", "cash_buy", "cash_sell", "spot_buy", "spot_sell"]
+    df = df[["date", "cash_buy", "cash_sell", "spot_buy", "spot_sell"]]
+    return df
 
 st.title("USD to TWD Converter - Bank of Taiwan Historical Rate")
 
@@ -48,20 +36,30 @@ with col2:
 rate_type = st.radio("Rate type", ["Cash", "Spot"], horizontal=True)
 
 if st.button("Convert"):
-    rate_data = get_rate_from_bot(date)
+    month_str = date.strftime("%Y-%m")
+    date_str = date.strftime("%Y/%m/%d")
     
-    if rate_data is None:
-        last_bd = get_last_business_day(date)
-        st.warning(f"{date} is a holiday. Using last business day: {last_bd.strftime('%Y-%m-%d')}")
-        date = last_bd
-        rate_data = get_rate_from_bot(date)
-    
-    if rate_data:
-        key = "cash_sell" if rate_type == "Cash" else "spot_sell"
-        rate = rate_data[key]
-        twd_result = usd_amount * rate
-        st.success(f"**Date:** {date.strftime('%Y-%m-%d')}")
-        st.metric(f"USD {rate_type} Sell Rate", f"{rate} TWD")
-        st.metric("Result", f"{usd_amount:.2f} USD = {twd_result:.2f} TWD")
-    else:
-        st.error("Failed to get rate data")
+    try:
+        df = get_rates_from_bot(month_str)
+        row = df[df["date"].str.contains(date_str)]
+        
+        if row.empty:
+            last_bd = get_last_business_day(date)
+            st.warning(f"{date_str} is a holiday. Using last business day: {last_bd.strftime('%Y-%m-%d')}")
+            date = last_bd
+            month_str = date.strftime("%Y-%m")
+            date_str = date.strftime("%Y/%m/%d")
+            df = get_rates_from_bot(month_str)
+            row = df[df["date"].str.contains(date_str)]
+        
+        if not row.empty:
+            key = "cash_sell" if rate_type == "Cash" else "spot_sell"
+            rate = float(row[key].values[0])
+            twd_result = usd_amount * rate
+            st.success(f"**Date:** {date.strftime('%Y-%m-%d')}")
+            st.metric(f"USD {rate_type} Sell Rate", f"{rate} TWD")
+            st.metric("Result", f"{usd_amount:.2f} USD = {twd_result:.2f} TWD")
+        else:
+            st.error("Failed to get rate data")
+    except Exception as e:
+        st.error(f"Error: {e}")
