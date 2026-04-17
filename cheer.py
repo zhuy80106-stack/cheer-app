@@ -26,12 +26,15 @@ def get_rate_from_bot(date):
     for row in rows:
         cells = row.find_all("td")
         if len(cells) >= 5 and date_str in row.text:
-            return {
-                "cash_buy": float(cells[0].text.strip()),
-                "cash_sell": float(cells[1].text.strip()),
-                "spot_buy": float(cells[2].text.strip()),
-                "spot_sell": float(cells[3].text.strip()),
-            }
+            try:
+                return {
+                    "cash_buy": float(cells[0].text.strip()),
+                    "cash_sell": float(cells[1].text.strip()),
+                    "spot_buy": float(cells[2].text.strip()),
+                    "spot_sell": float(cells[3].text.strip()),
+                }
+            except:
+                continue
     return None
 
 st.title("USD to TWD Converter - Bank of Taiwan Historical Rate")
