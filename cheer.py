@@ -21,27 +21,17 @@ def get_rates_from_bot(month_str):
     headers = {"User-Agent": "Mozilla/5.0"}
     response = requests.get(url, headers=headers)
     lines = response.text.strip().split("\n")
-    header = lines[0].split(",")
-    
-    rate_positions = [i for i, h in enumerate(header) if h == "Rate"]
-    cash_positions = [i for i, h in enumerate(header) if h == "Cash"]
-    spot_positions = [i for i, h in enumerate(header) if h == "Spot"]
-    
-    cash_buy_idx = cash_positions[0]
-    spot_buy_idx = spot_positions[0]
-    cash_sell_idx = cash_positions[1]
-    spot_sell_idx = spot_positions[1]
     
     data = []
     for line in lines[1:]:
         cols = line.split(",")
-        if cols[0] and cols[1] == "USD":
+        if len(cols) >= 16 and cols[1] == "USD":
             data.append({
                 "date": cols[0],
-                "cash_buy": cols[cash_buy_idx],
-                "cash_sell": cols[cash_sell_idx],
-                "spot_buy": cols[spot_buy_idx],
-                "spot_sell": cols[spot_sell_idx],
+                "cash_buy": cols[3],
+                "spot_buy": cols[4],
+                "cash_sell": cols[14],
+                "spot_sell": cols[15],
             })
     return pd.DataFrame(data)
 
