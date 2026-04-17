@@ -23,18 +23,25 @@ def get_rates_from_bot(month_str):
     lines = response.text.strip().split("\n")
     header = lines[0].split(",")
     
-    buying_idx = header.index("Cash")
-    selling_idx = header.index("Cash.1")
+    rate_positions = [i for i, h in enumerate(header) if h == "Rate"]
+    cash_positions = [i for i, h in enumerate(header) if h == "Cash"]
+    spot_positions = [i for i, h in enumerate(header) if h == "Spot"]
+    
+    cash_buy_idx = cash_positions[0]
+    spot_buy_idx = spot_positions[0]
+    cash_sell_idx = cash_positions[1]
+    spot_sell_idx = spot_positions[1]
+    
     data = []
     for line in lines[1:]:
         cols = line.split(",")
         if cols[0] and cols[1] == "USD":
             data.append({
                 "date": cols[0],
-                "cash_buy": cols[buying_idx],
-                "cash_sell": cols[selling_idx],
-                "spot_buy": cols[buying_idx + 1],
-                "spot_sell": cols[selling_idx + 1],
+                "cash_buy": cols[cash_buy_idx],
+                "cash_sell": cols[cash_sell_idx],
+                "spot_buy": cols[spot_buy_idx],
+                "spot_sell": cols[spot_sell_idx],
             })
     return pd.DataFrame(data)
 
