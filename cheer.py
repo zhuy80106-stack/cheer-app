@@ -30,8 +30,8 @@ def get_rates_from_bot(month_str):
                 "date": cols[0],
                 "cash_buy": cols[3],
                 "spot_buy": cols[4],
-                "cash_sell": cols[14],
-                "spot_sell": cols[15],
+                "cash_sell": cols[15],
+                "spot_sell": cols[14],
             })
     return pd.DataFrame(data)
 
