@@ -18,16 +18,25 @@ def get_last_business_day(date):
 @st.cache_data
 def get_rates_from_bot(month_str):
     url = f"https://rate.bot.com.tw/xrt/flcsv/0/{month_str}/USD"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "text/csv",
-        "Referer": "https://rate.bot.com.tw/xrt"
-    }
+    headers = {"User-Agent": "Mozilla/5.0"}
     response = requests.get(url, headers=headers)
-    df = pd.read_csv(StringIO(response.text))
-    df = df[["掛牌日期", "本行買入", "本行賣出", "本行買入.1", "本行賣出.1"]]
-    df.columns = ["date", "cash_buy", "cash_sell", "spot_buy", "spot_sell"]
-    return df
+    lines = response.text.strip().split("\n")
+    header = lines[0].split(",")
+    
+    buying_idx = header.index("Cash")
+    selling_idx = header.index("Cash.1")
+    data = []
+    for line in lines[1:]:
+        cols = line.split(",")
+        if cols[0] and cols[1] == "USD":
+            data.append({
+                "date": cols[0],
+                "cash_buy": cols[buying_idx],
+                "cash_sell": cols[selling_idx],
+                "spot_buy": cols[buying_idx + 1],
+                "spot_sell": cols[selling_idx + 1],
+            })
+    return pd.DataFrame(data)
 
 st.title("USD to TWD Converter - Bank of Taiwan Historical Rate")
 
@@ -41,20 +50,20 @@ rate_type = st.radio("Rate type", ["Cash", "Spot"], horizontal=True)
 
 if st.button("Convert"):
     month_str = date.strftime("%Y-%m")
-    date_str = date.strftime("%Y/%m/%d")
+    date_str = date.strftime("%Y%m%d")
     
     try:
         df = get_rates_from_bot(month_str)
-        row = df[df["date"].astype(str).str.contains(date_str)]
+        row = df[df["date"].str.contains(date_str)]
         
         if row.empty:
             last_bd = get_last_business_day(date)
             st.warning(f"{date_str} is a holiday. Using last business day: {last_bd.strftime('%Y-%m-%d')}")
             date = last_bd
             month_str = date.strftime("%Y-%m")
-            date_str = date.strftime("%Y/%m/%d")
+            date_str = date.strftime("%Y%m%d")
             df = get_rates_from_bot(month_str)
-            row = df[df["date"].astype(str).str.contains(date_str)]
+            row = df[df["date"].str.contains(date_str)]
         
         if not row.empty:
             key = "cash_sell" if rate_type == "Cash" else "spot_sell"
