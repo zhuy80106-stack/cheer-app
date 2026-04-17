@@ -3,7 +3,7 @@ import streamlit as st
 import datetime
 from datetime import timedelta
 import pandas as pd
-from io import StringIO
+import time
 
 st.set_page_config(page_title="USD to TWD Converter")
 
@@ -15,8 +15,8 @@ def get_last_business_day(date):
         check_date -= timedelta(days=1)
     return None
 
-@st.cache_data
-def get_rates_from_bot(month_str):
+@st.cache_data(ttl=3600)
+def get_rates_from_bot(month_str, _ts):
     url = f"https://rate.bot.com.tw/xrt/flcsv/0/{month_str}/USD"
     headers = {"User-Agent": "Mozilla/5.0"}
     response = requests.get(url, headers=headers)
@@ -25,12 +25,12 @@ def get_rates_from_bot(month_str):
     data = []
     for line in lines[1:]:
         cols = line.split(",")
-        if len(cols) >= 16 and cols[1] == "USD":
+        if len(cols) >= 15 and cols[1] == "USD":
             data.append({
                 "date": cols[0],
                 "cash_buy": cols[3],
                 "spot_buy": cols[4],
-                "cash_sell": cols[15],
+                "cash_sell": cols[13],
                 "spot_sell": cols[14],
             })
     return pd.DataFrame(data)
@@ -48,10 +48,11 @@ rate_type = st.radio("Rate type", ["Cash", "Spot"], horizontal=True)
 if st.button("Convert"):
     month_str = date.strftime("%Y-%m")
     date_str = date.strftime("%Y%m%d")
+    ts = int(time.time())
     
     try:
-        df = get_rates_from_bot(month_str)
-        row = df[df["date"].str.contains(date_str)]
+        df = get_rates_from_bot(month_str, ts)
+        row = df[df["date"].astype(str).str.contains(date_str)]
         
         if row.empty:
             last_bd = get_last_business_day(date)
@@ -59,8 +60,8 @@ if st.button("Convert"):
             date = last_bd
             month_str = date.strftime("%Y-%m")
             date_str = date.strftime("%Y%m%d")
-            df = get_rates_from_bot(month_str)
-            row = df[df["date"].str.contains(date_str)]
+            df = get_rates_from_bot(month_str, ts)
+            row = df[df["date"].astype(str).str.contains(date_str)]
         
         if not row.empty:
             key = "cash_sell" if rate_type == "Cash" else "spot_sell"
